@@ -12,6 +12,8 @@ import {
 import { QUERY_PRODUCTS } from '../utils/queries';
 import spinner from '../assets/spinner.gif';
 import Cart from '../components/Cart';
+import { idbPromise } from "../utils/helpers";
+
 
 
 function Detail() {
@@ -33,11 +35,18 @@ function Detail() {
         _id: id,
         purchaseQuantity: parseInt(itemInCart.purchaseQuantity) + 1
       });
+      //if we're updating quantity, use existing item data and incremen purchaseQuantity value by one
+      idbPromise('cart', 'put', {
+        ...itemInCart,
+        purchaseQuantity: parseInt(itemInCart.purchaseQuantity) + 1
+      });
     } else {
       dispatch({
         type: ADD_TO_CART,
         product: { ...currentProduct, purchaseQuantity: 1 }
       });
+      // if product isn't in the cart yet, add it to the current shopping cart in Indexed DB
+      idbPromise('cart', 'put', { ...currentProduct, purchaseQuantity: 1});
     }
   };
 
@@ -46,6 +55,8 @@ function Detail() {
       type: REMOVE_FROM_CART,
       _id: currentProduct._id
     });
+    //upon removal  from cart, delete item from IndexedDB using the 'currentProduct._id' to locate what to remove
+    idbPromise('cart', 'delete', { ...currentProduct});
   };
 
   // checks if data in our global state product array, if yes, find which one is current for display (matching id value)
@@ -57,8 +68,21 @@ function Detail() {
         type: UPDATE_PRODUCTS,
         products: data.products
       });
+
+      data.producs.forEach((product) => {
+        idbPromise('products', 'put', product);
+      });
     }
-  }, [products, data, dispatch, id]);
+    //get cache from idb
+    else if (!loading) {
+      idbPromise('products', 'get').then((indexeProducts) => {
+        dispatch({
+          type: UPDATE_PRODUCTS,
+          products: indexeProducts
+        });
+      });
+    }
+  }, [products, data, loading, dispatch, id]);
 
   return (
     <>
